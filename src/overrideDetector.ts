@@ -4,11 +4,11 @@ import { OverrideItem } from './types';
 export class OverrideDetector {
     public async detectOverrides(editor: vscode.TextEditor): Promise<OverrideItem[]> {
         const document = editor.document;
-        console.log(`[OverrideMark] Detecting overrides for ${document.uri.toString()}`);
+
 
         // Only process Python files
         if (document.languageId !== 'python') {
-            console.log('[OverrideMark] Not a python file');
+
             return [];
         }
 
@@ -24,14 +24,14 @@ export class OverrideDetector {
                 );
 
                 if (symbols && symbols.length > 0) {
-                    console.log(`[OverrideMark] Found ${symbols.length} root symbols`);
+
                     break;
                 }
-                console.log(`[OverrideMark] Found 0 symbols, retrying... (${retries - attempt} left)`);
+
             } catch (e: any) {
                 const msg = e.message || '';
                 if (msg.includes('LanguageServerClient must be initialized first') || msg.includes('Language server is not ready')) {
-                    console.log(`[OverrideMark] Language server not ready, waiting... (${retries - attempt} left)`);
+
                 } else {
                     console.error('[OverrideMark] Error getting symbols:', e);
                 }
@@ -45,7 +45,7 @@ export class OverrideDetector {
         }
 
         if (!symbols || symbols.length === 0) {
-            console.log('[OverrideMark] Giving up: No symbols found after retries');
+
             return [];
         }
 
@@ -71,12 +71,12 @@ export class OverrideDetector {
 
         for (const symbol of symbols) {
             if (symbol.kind === vscode.SymbolKind.Class) {
-                console.log(`[OverrideMark] Processing class ${symbol.name}`);
+
                 await this.processClass(document, symbol, results, classMethods);
             }
         }
 
-        console.log(`[OverrideMark] Found ${results.length} items`);
+
         return results;
     }
 
@@ -88,7 +88,7 @@ export class OverrideDetector {
     ) {
         // 1. Identify parent classes
         const parentLocations = await this.findParentLocations(document, classSymbol);
-        console.log(`[OverrideMark] Class ${classSymbol.name} has ${parentLocations.length} parent locations`);
+
 
 
 
@@ -99,20 +99,20 @@ export class OverrideDetector {
         if (parentLocations.length > 0) {
             for (const loc of parentLocations) {
                 try {
-                    console.log(`[OverrideMark] Resolving parent at ${loc.uri.toString()}`);
+
                     const remoteSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
                         'vscode.executeDocumentSymbolProvider',
                         loc.uri
                     );
 
                     if (!remoteSymbols) {
-                        console.log(`[OverrideMark] No symbols found for parent at ${loc.uri.toString()}`);
+
                         continue;
                     }
 
                     const parentClassSymbol = this.findSymbolAtLocation(remoteSymbols, loc.range);
                     if (parentClassSymbol) {
-                        console.log(`[OverrideMark] Found parent class symbol: ${parentClassSymbol.name}`);
+
                         parentClassNames.push(parentClassSymbol.name);
                         for (const child of parentClassSymbol.children) {
                             if (child.kind === vscode.SymbolKind.Method) {
@@ -122,13 +122,13 @@ export class OverrideDetector {
                             }
                         }
                     } else {
-                        console.log(`[OverrideMark] Could not find class symbol at location range`);
+
                     }
                 } catch (e) {
                     console.error(`[OverrideMark] Error processing parent at ${loc.uri}:`, e);
                 }
             }
-            console.log(`[OverrideMark] Parent methods: ${Array.from(parentMethods.keys()).join(', ')}`);
+
         }
 
         // 3. Check current class methods against parent methods (Override Detection)
@@ -139,7 +139,7 @@ export class OverrideDetector {
             if (child.kind === vscode.SymbolKind.Method) {
                 // Only check for overrides if we have parent methods
                 if (parentMethods.size > 0 && parentMethods.has(child.name)) {
-                    console.log(`[OverrideMark] Found override: ${child.name}`);
+
 
                     const parentInfo = parentMethods.get(child.name);
                     if (parentInfo) {
@@ -160,7 +160,6 @@ export class OverrideDetector {
         // 5. Subclass Detection (Reference Based)
         // We find references to the current class to identify subclasses
         const subclasses = await this.findSubclasses(document, classSymbol);
-        console.log(`[OverrideMark] Found ${subclasses.length} subclasses: ${subclasses.map(s => s.symbol.name).join(', ')}`);
 
         for (const { symbol: subclassSymbol, uri: subclassUri } of subclasses) {
             for (const child of subclassSymbol.children) {
@@ -204,56 +203,12 @@ export class OverrideDetector {
         }
     }
 
-    private async resolveSymbolName(uri: vscode.Uri, range: vscode.Range): Promise<string | undefined> {
-        try {
-            const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-                'vscode.executeDocumentSymbolProvider',
-                uri
-            );
-            if (!symbols) return undefined;
 
-            const symbol = this.findSymbolAtLocation(symbols, range);
-            if (symbol) {
-                // Try to find parent class name if possible
-                // Since findSymbolAtLocation returns the deepest match.
-                // If we want "Class.Method", we need the parent.
-
-                // Let's do a quick search for the parent class
-                const parentClass = this.findParentClassOfMethod(symbols, range);
-                if (parentClass) {
-                    return `${parentClass.name}.${symbol.name}`;
-                }
-                return symbol.name;
-            }
-        } catch (e) {
-            console.error(`[OverrideMark] Error resolving symbol name at ${uri}:`, e);
-        }
-        return undefined;
-    }
-
-    private findParentClassOfMethod(symbols: vscode.DocumentSymbol[], range: vscode.Range): vscode.DocumentSymbol | undefined {
-        for (const symbol of symbols) {
-            if (symbol.kind === vscode.SymbolKind.Class) {
-                if (symbol.range.contains(range)) {
-                    // Check if the method is a direct child
-                    for (const child of symbol.children) {
-                        if (child.range.contains(range)) {
-                            return symbol;
-                        }
-                    }
-                    // Recurse for nested classes
-                    const nested = this.findParentClassOfMethod(symbol.children, range);
-                    if (nested) return nested;
-                }
-            }
-        }
-        return undefined;
-    }
 
     private async findSubclasses(document: vscode.TextDocument, classSymbol: vscode.DocumentSymbol): Promise<{ symbol: vscode.DocumentSymbol, uri: vscode.Uri }[]> {
         const subclasses: { symbol: vscode.DocumentSymbol, uri: vscode.Uri }[] = [];
         try {
-            console.log(`[OverrideMark] Finding subclasses for ${classSymbol.name}`);
+
             const refs = await vscode.commands.executeCommand<vscode.Location[]>(
                 'vscode.executeReferenceProvider',
                 document.uri,
@@ -261,11 +216,11 @@ export class OverrideDetector {
             );
 
             if (!refs) {
-                console.log(`[OverrideMark] No references found for ${classSymbol.name}`);
+
                 return [];
             }
 
-            console.log(`[OverrideMark] Found ${refs.length} references for ${classSymbol.name}`);
+
 
             // Group by URI to avoid opening the same doc multiple times
             const refsByUri = new Map<string, vscode.Range[]>();
@@ -309,7 +264,6 @@ export class OverrideDetector {
 
                     if (match && match[1]) {
                         const subclassName = match[1];
-                        console.log(`[OverrideMark] Found potential subclass ${subclassName} in ${uriStr}`);
 
                         // Find the symbol for this subclass
                         const subClassSymbol = this.findClassSymbol(symbols, subclassName);

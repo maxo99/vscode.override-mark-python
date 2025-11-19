@@ -3,7 +3,7 @@ import { OverrideDetector } from './overrideDetector';
 import { OverrideCodeLensProvider } from './codeLensProvider';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Extension "python-override-mark" is now active!');
+
 
     const detector = new OverrideDetector();
     const codeLensProvider = new OverrideCodeLensProvider();
@@ -28,9 +28,9 @@ export function activate(context: vscode.ExtensionContext) {
                 // Ensure Python extension is activated
                 const pythonExtension = vscode.extensions.getExtension('ms-python.python');
                 if (pythonExtension && !pythonExtension.isActive) {
-                    console.log('[OverrideMark] Waiting for Python extension to activate...');
+
                     pythonExtension.activate().then(() => {
-                        console.log('[OverrideMark] Python extension activated');
+
                         // Re-trigger update after activation
                         triggerUpdate();
                     });
@@ -67,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('pythonOverrideMark.navigateTo', async (uriStr: string, line: number, character: number) => {
-            console.log(`[OverrideMark] Command triggered: navigateTo ${uriStr}:${line}:${character}`);
+
             try {
                 const uri = vscode.Uri.parse(uriStr);
                 const position = new vscode.Position(line, character);
