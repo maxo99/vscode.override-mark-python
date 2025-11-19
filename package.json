@@ -1,0 +1,39 @@
+{
+  "name": "python-override-mark",
+  "displayName": "Python Override Mark",
+  "description": "Visual indicator for overridden methods in Python",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:python"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Python Override Mark",
+      "properties": {
+        "pythonOverrideMark.debounceDelay": {
+          "type": "number",
+          "default": 500,
+          "description": "Delay in milliseconds before updating marks after typing."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "16.x",
+    "typescript": "^5.1.3"
+  }
+}
