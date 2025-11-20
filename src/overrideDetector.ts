@@ -5,10 +5,8 @@ export class OverrideDetector {
     public async detectOverrides(editor: vscode.TextEditor): Promise<OverrideItem[]> {
         const document = editor.document;
 
-
         // Only process Python files
         if (document.languageId !== 'python') {
-
             return [];
         }
 
@@ -24,14 +22,13 @@ export class OverrideDetector {
                 );
 
                 if (symbols && symbols.length > 0) {
-
                     break;
                 }
 
             } catch (e: any) {
                 const msg = e.message || '';
                 if (msg.includes('LanguageServerClient must be initialized first') || msg.includes('Language server is not ready')) {
-
+                    // Wait
                 } else {
                     console.error('[OverrideMark] Error getting symbols:', e);
                 }
@@ -45,7 +42,6 @@ export class OverrideDetector {
         }
 
         if (!symbols || symbols.length === 0) {
-
             return [];
         }
 
@@ -71,11 +67,9 @@ export class OverrideDetector {
 
         for (const symbol of symbols) {
             if (symbol.kind === vscode.SymbolKind.Class) {
-
                 await this.processClass(document, symbol, results, classMethods);
             }
         }
-
 
         return results;
     }
@@ -89,31 +83,23 @@ export class OverrideDetector {
         // 1. Identify parent classes
         const parentLocations = await this.findParentLocations(document, classSymbol);
 
-
-
-
         // 2. Collect all methods from immediate parents (Only if parents exist)
         const parentMethods = new Map<string, { loc: vscode.Location, className: string }>();
-        const parentClassNames: string[] = [];
 
         if (parentLocations.length > 0) {
             for (const loc of parentLocations) {
                 try {
-
                     const remoteSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
                         'vscode.executeDocumentSymbolProvider',
                         loc.uri
                     );
 
                     if (!remoteSymbols) {
-
                         continue;
                     }
 
                     const parentClassSymbol = this.findSymbolAtLocation(remoteSymbols, loc.range);
                     if (parentClassSymbol) {
-
-                        parentClassNames.push(parentClassSymbol.name);
                         for (const child of parentClassSymbol.children) {
                             if (child.kind === vscode.SymbolKind.Method) {
                                 // Store location for navigation
@@ -121,14 +107,11 @@ export class OverrideDetector {
                                 parentMethods.set(child.name, { loc: methodLoc, className: parentClassSymbol.name });
                             }
                         }
-                    } else {
-
                     }
                 } catch (e) {
                     console.error(`[OverrideMark] Error processing parent at ${loc.uri}:`, e);
                 }
             }
-
         }
 
         // 3. Check current class methods against parent methods (Override Detection)
@@ -139,8 +122,6 @@ export class OverrideDetector {
             if (child.kind === vscode.SymbolKind.Method) {
                 // Only check for overrides if we have parent methods
                 if (parentMethods.size > 0 && parentMethods.has(child.name)) {
-
-
                     const parentInfo = parentMethods.get(child.name);
                     if (parentInfo) {
                         results.push({
@@ -151,8 +132,6 @@ export class OverrideDetector {
                             parentRange: parentInfo.loc.range
                         });
                     }
-
-                    // (Legacy logic removed in favor of provider-based approach below)
                 }
             }
         }
@@ -175,7 +154,6 @@ export class OverrideDetector {
 
                         // Avoid duplicates if we somehow process the same thing twice
                         const children = implementations.get(parentKey)!.children;
-                        const childId = `${subclassUri.toString()}:${child.selectionRange.start.line}`;
                         // We don't have a unique ID in the children array, so let's just check if we have one with same URI and range
                         const exists = children.some(c => c.uri.toString() === subclassUri.toString() && c.range.isEqual(child.selectionRange));
 
@@ -203,12 +181,9 @@ export class OverrideDetector {
         }
     }
 
-
-
     private async findSubclasses(document: vscode.TextDocument, classSymbol: vscode.DocumentSymbol): Promise<{ symbol: vscode.DocumentSymbol, uri: vscode.Uri }[]> {
         const subclasses: { symbol: vscode.DocumentSymbol, uri: vscode.Uri }[] = [];
         try {
-
             const refs = await vscode.commands.executeCommand<vscode.Location[]>(
                 'vscode.executeReferenceProvider',
                 document.uri,
@@ -216,11 +191,8 @@ export class OverrideDetector {
             );
 
             if (!refs) {
-
                 return [];
             }
-
-
 
             // Group by URI to avoid opening the same doc multiple times
             const refsByUri = new Map<string, vscode.Range[]>();
@@ -254,23 +226,28 @@ export class OverrideDetector {
                 if (!symbols) continue;
 
                 for (const range of ranges) {
-                    // Check if this reference is a subclass definition
-                    const lineText = doc.lineAt(range.start.line).text;
-                    // Regex to match "class Subclass(..., Parent, ...):"
-                    // We need to match the class name and ensure 'classSymbol.name' is in the parens.
-                    // Note: classSymbol.name is the Parent class name.
-                    const classNameRegex = new RegExp(`class\\s+(\\w+)\\s*\\(.*\\b${classSymbol.name}\\b.*\\)`);
-                    const match = classNameRegex.exec(lineText);
+                    // Find the symbol that contains this reference
+                    const enclosingSymbol = this.getSymbolContaining(symbols, range);
 
-                    if (match && match[1]) {
-                        const subclassName = match[1];
+                    // Check if the enclosing symbol is a class and the reference is in the inheritance list
+                    if (enclosingSymbol && enclosingSymbol.kind === vscode.SymbolKind.Class) {
+                        // To confirm it's in the inheritance list (and not a class attribute),
+                        // we check if the reference is inside the class definition parentheses.
+                        // We read text from the class start to the reference start.
+                        const textBefore = this.getTextRange(doc, enclosingSymbol.range.start, range.start);
 
-                        // Find the symbol for this subclass
-                        const subClassSymbol = this.findClassSymbol(symbols, subclassName);
-                        if (subClassSymbol) {
+                        // Count open parentheses to see if we are inside the class definition
+                        let openParens = 0;
+                        for (const char of textBefore) {
+                            if (char === '(') openParens++;
+                            if (char === ')') openParens--;
+                        }
+
+                        // If we have more open parens, we are likely in the inheritance list: class Child(Parent...
+                        if (openParens > 0) {
                             // Avoid duplicates
-                            if (!subclasses.some(s => s.symbol.name === subClassSymbol.name && s.uri.toString() === uriStr)) {
-                                subclasses.push({ symbol: subClassSymbol, uri });
+                            if (!subclasses.some(s => s.symbol.name === enclosingSymbol.name && s.uri.toString() === uriStr)) {
+                                subclasses.push({ symbol: enclosingSymbol, uri });
                             }
                         }
                     }
@@ -281,6 +258,21 @@ export class OverrideDetector {
             console.error('[OverrideMark] Error finding subclasses:', e);
         }
         return subclasses;
+    }
+
+    private getSymbolContaining(symbols: vscode.DocumentSymbol[], range: vscode.Range): vscode.DocumentSymbol | undefined {
+        for (const symbol of symbols) {
+            if (symbol.range.contains(range)) {
+                const child = this.getSymbolContaining(symbol.children, range);
+                if (child) return child;
+                return symbol;
+            }
+        }
+        return undefined;
+    }
+
+    private getTextRange(document: vscode.TextDocument, start: vscode.Position, end: vscode.Position): string {
+        return document.getText(new vscode.Range(start, end));
     }
 
     private findClassSymbol(symbols: vscode.DocumentSymbol[], name: string): vscode.DocumentSymbol | undefined {
@@ -299,65 +291,103 @@ export class OverrideDetector {
     private async findParentLocations(document: vscode.TextDocument, classSymbol: vscode.DocumentSymbol): Promise<vscode.Location[]> {
         const locations: vscode.Location[] = [];
 
-        // Simple regex to find parent names in "class ClassName(Parent1, Parent2):"
-        // We limit the search to the start line of the class.
-        const lineText = document.lineAt(classSymbol.range.start.line).text;
-        console.log(`[OverrideMark] Class definition line: ${lineText}`);
-        const match = /class\s+\w+\s*\(([^)]+)\)/.exec(lineText);
+        // Optimization: Ensure the symbol actually looks like a class definition
+        // (LSP sometimes returns imports as Class symbols)
+        const nameLine = document.lineAt(classSymbol.selectionRange.start.line).text;
+        if (!/\bclass\b/.test(nameLine)) {
+            return [];
+        }
+
+        // Read the class definition header (handling multi-line)
+        // We accumulate text until we find the colon that starts the body
+        let headerText = '';
+        let lineIdx = classSymbol.range.start.line;
+        let maxLines = 20; // Safety limit
+        let linesRead = 0;
+
+        while (lineIdx < document.lineCount && linesRead < maxLines) {
+            const line = document.lineAt(lineIdx).text;
+            // Remove comments for cleaner parsing
+            const commentIndex = line.indexOf('#');
+            const cleanLine = commentIndex >= 0 ? line.substring(0, commentIndex) : line;
+
+            headerText += cleanLine + '\n';
+
+            if (cleanLine.trim().endsWith(':')) {
+                break;
+            }
+            lineIdx++;
+            linesRead++;
+        }
+
+        // Regex to find content inside parentheses: class Name(...)
+        // [\s\S]*? matches any character including newlines non-greedily
+        const match = /class\s+\w+\s*\(([\s\S]*?)\)/.exec(headerText);
 
         if (match && match[1]) {
-            const parents = match[1].split(',').map(p => p.trim());
-            console.log(`[OverrideMark] Identified potential parents: ${parents.join(', ')}`);
+            // Split by comma, but be careful about nested parens
+            const parents = match[1].split(',').map(p => p.trim()).filter(p => p.length > 0);
 
             for (const parent of parents) {
-                const parentIndex = lineText.indexOf(parent);
-                if (parentIndex >= 0) {
-                    const pos = new vscode.Position(classSymbol.range.start.line, parentIndex);
-                    try {
-                        const definition = await vscode.commands.executeCommand<vscode.Location | vscode.Location[] | vscode.LocationLink[]>(
-                            'vscode.executeDefinitionProvider',
-                            document.uri,
-                            pos
-                        );
+                // We need to find the position of this parent string in the document to resolve it.
+                let currentLineIdx = classSymbol.range.start.line;
+                let found = false;
 
-                        if (definition) {
-                            if (Array.isArray(definition)) {
-                                if (definition.length > 0) {
-                                    const first = definition[0];
-                                    if ('targetUri' in first) {
-                                        locations.push(new vscode.Location(first.targetUri, first.targetRange));
-                                    } else {
-                                        locations.push(first as vscode.Location);
+                // Create a regex to find the parent name as a whole word
+                // Escape special regex characters in parent name just in case
+                const escapedParent = parent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const parentRegex = new RegExp(`\\b${escapedParent}\\b`);
+
+                // Search line by line
+                while (currentLineIdx <= lineIdx) {
+                    const lineText = document.lineAt(currentLineIdx).text;
+                    const match = parentRegex.exec(lineText);
+
+                    if (match) {
+                        // Found it
+                        const parentIdx = match.index;
+                        const pos = new vscode.Position(currentLineIdx, parentIdx);
+                        try {
+                            const definition = await vscode.commands.executeCommand<vscode.Location | vscode.Location[] | vscode.LocationLink[]>(
+                                'vscode.executeDefinitionProvider',
+                                document.uri,
+                                pos
+                            );
+
+                            if (definition) {
+                                if (Array.isArray(definition)) {
+                                    if (definition.length > 0) {
+                                        const first = definition[0];
+                                        if ('targetUri' in first) {
+                                            locations.push(new vscode.Location(first.targetUri, first.targetRange));
+                                        } else {
+                                            locations.push(first as vscode.Location);
+                                        }
                                     }
+                                } else {
+                                    locations.push(definition as vscode.Location);
                                 }
-                            } else {
-                                locations.push(definition as vscode.Location);
                             }
-                        } else {
-                            console.log(`[OverrideMark] No definition found for parent ${parent}`);
+                        } catch (e) {
+                            console.error(`[OverrideMark] Error resolving parent ${parent}:`, e);
                         }
-                    } catch (e) {
-                        console.error(`[OverrideMark] Error resolving parent ${parent}:`, e);
+                        found = true;
+                        break; // Move to next parent
                     }
+                    currentLineIdx++;
                 }
             }
-        } else {
-            console.log(`[OverrideMark] No parent pattern match for ${classSymbol.name}`);
         }
         return locations;
     }
 
     private findSymbolAtLocation(symbols: vscode.DocumentSymbol[], range: vscode.Range): vscode.DocumentSymbol | undefined {
         for (const symbol of symbols) {
-            // Check if the symbol's range contains the target range
-            // The target range is usually the definition range of the class name
             if (symbol.range.contains(range.start)) {
-                // If it has children, check them first (nested classes)
                 if (symbol.children.length > 0) {
                     const child = this.findSymbolAtLocation(symbol.children, range);
                     if (child) return child;
                 }
-                // If it's a class, return it
                 if (symbol.kind === vscode.SymbolKind.Class) {
                     return symbol;
                 }
