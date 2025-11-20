@@ -2,7 +2,7 @@
   "name": "python-override-mark",
   "displayName": "Python Override Mark",
   "description": "Visual indicator for overridden methods in Python",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.80.0"
   },
