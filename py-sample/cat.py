@@ -1,8 +1,10 @@
 
-from animal import Animal
+from animal import Animals
 
-class Cat(Animal):
-    def speak(self):  # <--- Should have an arrow icon in the gutter
+class Cats(Animal):
+
+    def speak(self):  # <--- Should have CodeLens
         print("Meow")
-    def meow(self):   # <--- Should NOT have an icon (new method)
+
+    def meow(self):   # <--- Should NOT have CodeLens (new method)
         print("Meow") 
