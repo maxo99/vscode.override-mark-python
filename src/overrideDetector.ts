@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { OverrideItem } from './types';
+import { SubclassCache, ReferenceClassificationCache } from './caching';
 
 export class OverrideDetector {
     public async detectOverrides(editor: vscode.TextEditor): Promise<OverrideItem[]> {
@@ -231,7 +232,15 @@ export class OverrideDetector {
     }
 
     private async findSubclasses(document: vscode.TextDocument, classSymbol: vscode.DocumentSymbol): Promise<{ symbol: vscode.DocumentSymbol, uri: vscode.Uri }[]> {
+        const subclassCache = SubclassCache.getInstance();
+        const cached = subclassCache.get(document.uri, classSymbol.name);
+        if (cached) {
+            return cached;
+        }
+
         const subclasses: { symbol: vscode.DocumentSymbol, uri: vscode.Uri }[] = [];
+        const refCache = ReferenceClassificationCache.getInstance();
+
         try {
             const refs = await vscode.commands.executeCommand<vscode.Location[]>(
                 'vscode.executeReferenceProvider',
@@ -246,6 +255,12 @@ export class OverrideDetector {
             // Group by URI to avoid opening the same doc multiple times
             const refsByUri = new Map<string, vscode.Range[]>();
             for (const ref of refs) {
+                // Check reference cache first
+                const isSubclass = refCache.get(ref.uri, ref.range);
+                if (isSubclass === false) {
+                    continue; // Known non-subclass
+                }
+
                 const uriStr = ref.uri.toString();
                 if (!refsByUri.has(uriStr)) {
                     refsByUri.set(uriStr, []);
@@ -275,6 +290,8 @@ export class OverrideDetector {
                 if (!symbols) continue;
 
                 for (const range of ranges) {
+                    let isSubclassRef = false;
+
                     // Find the symbol that contains this reference
                     const enclosingSymbol = this.getSymbolContaining(symbols, range);
 
@@ -294,14 +311,21 @@ export class OverrideDetector {
 
                         // If we have more open parens, we are likely in the inheritance list: class Child(Parent...
                         if (openParens > 0) {
+                            isSubclassRef = true;
                             // Avoid duplicates
                             if (!subclasses.some(s => s.symbol.name === enclosingSymbol.name && s.uri.toString() === uriStr)) {
                                 subclasses.push({ symbol: enclosingSymbol, uri });
                             }
                         }
                     }
+
+                    // Update reference cache
+                    refCache.set(uri, range, isSubclassRef);
                 }
             }
+
+            // Update subclass cache
+            subclassCache.set(document.uri, classSymbol.name, subclasses);
 
         } catch (e) {
             console.error('[OverrideMark] Error finding subclasses:', e);

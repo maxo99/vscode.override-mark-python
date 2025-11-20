@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { OverrideDetector } from './overrideDetector';
 import { OverrideCodeLensProvider } from './codeLensProvider';
+import { SubclassCache, ReferenceClassificationCache } from './caching';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -61,6 +62,19 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeTextDocument(event => {
             if (activeEditor && event.document === activeEditor.document) {
                 triggerUpdate();
+            }
+
+            // Cache Invalidation
+            // 1. Reference Classification: Always invalidate for the changed file
+            ReferenceClassificationCache.getInstance().invalidateFile(event.document.uri);
+
+            // 2. Subclass Cache: Invalidate if 'class' keyword is involved or simply clear all for safety
+            // Optimization: Check if changes involve 'class' keyword
+            const contentChanges = event.contentChanges;
+            const involvesClass = contentChanges.some(c => c.text.includes('class') || c.text.includes('(') || c.text.includes(')'));
+
+            if (involvesClass) {
+                SubclassCache.getInstance().clear();
             }
         })
     );
