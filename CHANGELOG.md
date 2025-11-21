@@ -1,5 +1,14 @@
 # Changelog
 
+* docs: adding examples to readme (100ddf3)
+* chore: including publish script (365f23c)
+* docs: updating samples (20b6c1a)
+* test: add VS Code extension testing (b95db4b)
+* test: update sample cases (a058314)
+* feat: implement a SubclassCache singleton (e583892)
+* build: vsce packaging (0401d54)
+* chore: release prep (f313e86)
+
 # 0.1.0 (2025-11-20)
 
 
