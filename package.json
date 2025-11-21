@@ -43,6 +43,7 @@
     "watch": "tsc -watch -p ./",
     "release": "release-it",
     "package": "vsce package",
+    "publish": "vsce publish",
     "test": "npm run compile && node ./out/test/runTest.js"
   },
   "devDependencies": {
