@@ -47,13 +47,12 @@ class NestedChild(NestedParent):
 class Bread:
 
     @abstractmethod
-    def prep(self) -> str:
+    def preperation(self) -> str:
         raise NotImplementedError
 
 class Sandwich(Bread):
 
-    # Sandwiches are endless
-    def prep(self) -> str:
+    def preperation(self) -> str:
         return 'endless'
 
     @property
@@ -62,13 +61,12 @@ class Sandwich(Bread):
 
 class Toast(Bread):
     
-    def prep(self) -> str:
+    def preperation(self) -> str:
         return 'toasted'
 
 class Burger(Sandwich):
 
-    # Burger is best grilled
-    def prep(self) -> str:
+    def preperation(self) -> str:
         return 'grilled'
 
     @property
@@ -83,6 +81,5 @@ class HotDog(Bread):
     def has_top(self):
         return False
 
-    # HotDog is best grilled
-    def prep(self) -> str:
+    def preperation(self) -> str:
         return 'grilled'
