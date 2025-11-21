@@ -18,12 +18,12 @@ Visual and interactive indicators for overridden methods in Python.
 ## Examples
 
 ### Inheritance CodeLens
-![Inheritance CodeLens](screenshots/sample-bread.png)
+![Inheritance CodeLens](https://raw.githubusercontent.com/maxo99/vscode.python-override-mark/main/screenshots/sample-bread.png)
 
 
 ### Navigation
 
-![Click Navigation](screenshots/sample-navigation.png)
+![Click Navigation](https://raw.githubusercontent.com/maxo99/vscode.python-override-mark/main/screenshots/sample-navigation.png)
 
 
 ## Requirements
