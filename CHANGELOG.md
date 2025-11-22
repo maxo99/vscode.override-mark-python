@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](/compare/v0.2.1...v0.2.2) (2025-11-22)
+
+
+### Bug Fixes
+
+* proper repo for public documentation e7e5653
+
 ## [0.2.1](/compare/v0.2.0...v0.2.1) (2025-11-21)
 
 # [0.2.0](/compare/v0.1.0...v0.2.0) (2025-11-21)
